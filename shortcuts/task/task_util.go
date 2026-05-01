@@ -24,7 +24,7 @@ func isRelativeTime(s string) bool {
 func parseRelativeTime(s string) (time.Time, error) {
 	matches := relativeTimeRe.FindStringSubmatch(s)
 	if len(matches) == 0 {
-		return time.Time{}, fmt.Errorf("invalid relative time format: %s", s)
+		return time.Time{}, output.ErrValidation("invalid relative time format: %s", s)
 	}
 
 	sign := matches[1]
@@ -50,9 +50,8 @@ func parseRelativeTime(s string) (time.Time, error) {
 		return now.Add(time.Duration(amount) * time.Minute), nil
 	case "h":
 		return now.Add(time.Duration(amount) * time.Hour), nil
-	default:
-		return time.Time{}, fmt.Errorf("unknown unit: %s", unit)
 	}
+	panic(fmt.Sprintf("unreachable: relativeTimeRe matched unexpected unit %q", unit))
 }
 
 const (

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/larksuite/cli/internal/output"
 	"github.com/larksuite/cli/shortcuts/common"
 	larkcore "github.com/larksuite/oapi-sdk-go/v3/core"
 )
@@ -98,7 +99,7 @@ func buildTaskCreateBody(runtime *common.RuntimeContext) (map[string]interface{}
 	// Handle generic JSON payload if provided
 	if dataStr := runtime.Str("data"); dataStr != "" {
 		if err := json.Unmarshal([]byte(dataStr), &body); err != nil {
-			return nil, fmt.Errorf("--data must be a valid JSON object: %v", err)
+			return nil, output.ErrValidation("--data must be a valid JSON object: %v", err)
 		}
 	}
 
@@ -134,7 +135,7 @@ func buildTaskCreateBody(runtime *common.RuntimeContext) (map[string]interface{}
 	if dueStr := runtime.Str("due"); dueStr != "" {
 		dueObj, err := parseTaskTime(dueStr)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse due time: %v", err)
+			return nil, output.ErrValidation("failed to parse due time: %v", err)
 		}
 		body["due"] = dueObj
 	}
@@ -145,7 +146,7 @@ func buildTaskCreateBody(runtime *common.RuntimeContext) (map[string]interface{}
 
 	summary, _ := body["summary"].(string)
 	if strings.TrimSpace(summary) == "" {
-		return nil, fmt.Errorf("task summary is required")
+		return nil, output.ErrValidation("task summary is required")
 	}
 
 	return body, nil
@@ -201,7 +202,7 @@ var CreateTask = common.Shortcut{
 		var result map[string]interface{}
 		if err == nil {
 			if parseErr := json.Unmarshal(apiResp.RawBody, &result); parseErr != nil {
-				return fmt.Errorf("failed to parse response: %v", parseErr)
+				return output.Errorf(output.ExitAPI, "api_error", "failed to parse response: %v", parseErr)
 			}
 		}
 

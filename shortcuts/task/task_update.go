@@ -76,7 +76,7 @@ var UpdateTask = common.Shortcut{
 			var result map[string]interface{}
 			if err == nil {
 				if parseErr := json.Unmarshal(apiResp.RawBody, &result); parseErr != nil {
-					return fmt.Errorf("failed to parse response for task %s: %v", taskId, parseErr)
+					return output.Errorf(output.ExitAPI, "api_error", "failed to parse response for task %s: %v", taskId, parseErr)
 				}
 			}
 
@@ -133,7 +133,7 @@ func buildTaskUpdateBody(runtime *common.RuntimeContext) (map[string]interface{}
 
 	if dataStr := runtime.Str("data"); dataStr != "" {
 		if err := json.Unmarshal([]byte(dataStr), &taskObj); err != nil {
-			return nil, fmt.Errorf("--data must be a valid JSON object: %v", err)
+			return nil, output.ErrValidation("--data must be a valid JSON object: %v", err)
 		}
 		// If data is provided, assume keys are update fields
 		for k := range taskObj {
@@ -158,7 +158,7 @@ func buildTaskUpdateBody(runtime *common.RuntimeContext) (map[string]interface{}
 	if dueStr := runtime.Str("due"); dueStr != "" {
 		dueObj, err := parseTaskTime(dueStr)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse due time: %v", err)
+			return nil, output.ErrValidation("failed to parse due time: %v", err)
 		}
 		taskObj["due"] = dueObj
 		if !contains(updateFields, "due") {
@@ -167,7 +167,7 @@ func buildTaskUpdateBody(runtime *common.RuntimeContext) (map[string]interface{}
 	}
 
 	if len(updateFields) == 0 {
-		return nil, fmt.Errorf("no fields to update")
+		return nil, output.ErrValidation("no fields to update")
 	}
 
 	return map[string]interface{}{

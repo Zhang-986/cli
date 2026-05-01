@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/larksuite/cli/internal/output"
 )
 
 func splitAndTrimCSV(input string) []string {
@@ -44,7 +46,7 @@ func parseTimeRangeMillis(input string) (string, string, error) {
 		}
 		startSecInt, err = strconv.ParseInt(startSec, 10, 64)
 		if err != nil {
-			return "", "", fmt.Errorf("invalid start timestamp: %w", err)
+			return "", "", output.ErrValidation("invalid start timestamp: %v", err)
 		}
 		hasStart = true
 		startMillis = startSec + "000"
@@ -56,13 +58,13 @@ func parseTimeRangeMillis(input string) (string, string, error) {
 		}
 		endSecInt, err = strconv.ParseInt(endSec, 10, 64)
 		if err != nil {
-			return "", "", fmt.Errorf("invalid end timestamp: %w", err)
+			return "", "", output.ErrValidation("invalid end timestamp: %v", err)
 		}
 		hasEnd = true
 		endMillis = endSec + "000"
 	}
 	if hasStart && hasEnd && startSecInt > endSecInt {
-		return "", "", fmt.Errorf("start time must be earlier than or equal to end time")
+		return "", "", output.ErrValidation("start time must be earlier than or equal to end time")
 	}
 	return startMillis, endMillis, nil
 }
@@ -89,7 +91,7 @@ func parseTimeRangeRFC3339(input string) (string, string, error) {
 		}
 		startSecInt, err = strconv.ParseInt(startSec, 10, 64)
 		if err != nil {
-			return "", "", fmt.Errorf("invalid start timestamp: %w", err)
+			return "", "", output.ErrValidation("invalid start timestamp: %v", err)
 		}
 		hasStart = true
 		startTime = time.Unix(startSecInt, 0).Local().Format(time.RFC3339)
@@ -101,13 +103,13 @@ func parseTimeRangeRFC3339(input string) (string, string, error) {
 		}
 		endSecInt, err = strconv.ParseInt(endSec, 10, 64)
 		if err != nil {
-			return "", "", fmt.Errorf("invalid end timestamp: %w", err)
+			return "", "", output.ErrValidation("invalid end timestamp: %v", err)
 		}
 		hasEnd = true
 		endTime = time.Unix(endSecInt, 0).Local().Format(time.RFC3339)
 	}
 	if hasStart && hasEnd && startSecInt > endSecInt {
-		return "", "", fmt.Errorf("start time must be earlier than or equal to end time")
+		return "", "", output.ErrValidation("start time must be earlier than or equal to end time")
 	}
 	return startTime, endTime, nil
 }

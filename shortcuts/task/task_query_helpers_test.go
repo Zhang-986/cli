@@ -4,8 +4,11 @@
 package task
 
 import (
+	"errors"
 	"strings"
 	"testing"
+
+	"github.com/larksuite/cli/internal/output"
 )
 
 func TestSplitAndTrimCSV(t *testing.T) {
@@ -94,6 +97,18 @@ func TestParseTimeRangeMillisAndRequireSearchFilter(t *testing.T) {
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("parseTimeRangeMillis(%q) expected error, got nil", tt.input)
+				}
+				if tt.name == "reversed range fails fast" {
+					var exitErr *output.ExitError
+					if !errors.As(err, &exitErr) {
+						t.Fatalf("error type = %T, want *output.ExitError; error = %v", err, err)
+					}
+					if exitErr.Code != output.ExitValidation {
+						t.Errorf("exit code = %d, want %d", exitErr.Code, output.ExitValidation)
+					}
+					if exitErr.Detail == nil || exitErr.Detail.Type != "validation" {
+						t.Errorf("error detail type = %q, want %q", exitErr.Detail.Type, "validation")
+					}
 				}
 				return
 			}
@@ -259,6 +274,15 @@ func TestRenderRelatedTasksPretty(t *testing.T) {
 					if tt.wantErr {
 						if err == nil {
 							t.Fatal("expected error, got nil")
+						}
+						if tt.name == "reversed range fails fast" {
+							var exitErr *output.ExitError
+							if !errors.As(err, &exitErr) {
+								t.Fatalf("error type = %T, want *output.ExitError; error = %v", err, err)
+							}
+							if exitErr.Code != output.ExitValidation {
+								t.Errorf("exit code = %d, want %d", exitErr.Code, output.ExitValidation)
+							}
 						}
 						return
 					}
