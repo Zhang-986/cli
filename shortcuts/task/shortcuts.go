@@ -248,6 +248,7 @@ var CreateTask = common.Shortcut{
 func Shortcuts() []common.Shortcut {
 	return []common.Shortcut{
 		CreateTask,
+		GetTask,
 		UpdateTask,
 		SetAncestorTask,
 		CommentTask,
