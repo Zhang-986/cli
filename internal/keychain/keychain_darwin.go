@@ -269,16 +269,41 @@ func platformGet(service, account string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	migrateToFileMasterKey(service, account, plaintext)
+
 	return plaintext, nil
+}
+
+// migrateToFileMasterKey re-encrypts a secret with the file-based master key
+// so that future reads work in background/automation contexts without system keychain access.
+func migrateToFileMasterKey(service, account, plaintext string) {
+	fileKey, err := getFileMasterKey(service, true)
+	if err != nil {
+		return
+	}
+	encrypted, err := encryptData(plaintext, fileKey)
+	if err != nil {
+		return
+	}
+	dir := StorageDir(service)
+	targetPath := filepath.Join(dir, safeFileName(account))
+	tmpPath := targetPath + "." + uuid.New().String() + ".tmp"
+	if vfs.WriteFile(tmpPath, encrypted, 0600) != nil {
+		return
+	}
+	if vfs.Rename(tmpPath, targetPath) != nil {
+		_ = vfs.Remove(tmpPath)
+	}
 }
 
 // platformSet stores a value in the macOS keychain.
 func platformSet(service, account, data string) error {
 	key, err := getFileMasterKey(service, false)
 	if err != nil {
-		key, err = getMasterKey(service, true)
+		key, err = getFileMasterKey(service, true)
 		if err != nil {
-			key, err = getFileMasterKey(service, true)
+			key, err = getMasterKey(service, true)
 			if err != nil {
 				return err
 			}

@@ -55,6 +55,126 @@ func TestPlatformSetFallsBackToFileMasterKey(t *testing.T) {
 	}
 }
 
+// TestPlatformSetCreatesFileMasterKeyFirst verifies that platformSet creates a
+// file-based master key before attempting system keychain access, ensuring
+// credentials stored in interactive sessions are readable in background contexts.
+func TestPlatformSetCreatesFileMasterKeyFirst(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	keychainKey := make([]byte, masterKeyBytes)
+	for i := range keychainKey {
+		keychainKey[i] = byte(i + 33)
+	}
+
+	keyringGetCalled := false
+	origGet := keyringGet
+	origSet := keyringSet
+	keyringGet = func(service, user string) (string, error) {
+		keyringGetCalled = true
+		return "", keyring.ErrNotFound
+	}
+	keyringSet = func(service, user, password string) error {
+		return nil
+	}
+	t.Cleanup(func() {
+		keyringGet = origGet
+		keyringSet = origSet
+	})
+
+	service := "test-service"
+	account := "test-account"
+	secret := "secret-value"
+
+	if err := platformSet(service, account, secret); err != nil {
+		t.Fatalf("platformSet() error = %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(StorageDir(service), fileMasterKeyName)); err != nil {
+		t.Fatalf("file master key not created: %v", err)
+	}
+
+	if keyringGetCalled {
+		t.Error("system keychain should not be accessed when file master key can be created")
+	}
+
+	got, err := platformGet(service, account)
+	if err != nil {
+		t.Fatalf("platformGet() error = %v", err)
+	}
+	if got != secret {
+		t.Fatalf("platformGet() = %q, want %q", got, secret)
+	}
+}
+
+// TestMigrateToFileMasterKey verifies that secrets encrypted with the system
+// keychain master key are automatically migrated to the file-based master key
+// on first successful read, enabling subsequent reads without system keychain access.
+func TestMigrateToFileMasterKey(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	keychainKey := make([]byte, masterKeyBytes)
+	for i := range keychainKey {
+		keychainKey[i] = byte(i + 33)
+	}
+
+	keyringAvailable := true
+	origGet := keyringGet
+	origSet := keyringSet
+	keyringGet = func(service, user string) (string, error) {
+		if !keyringAvailable {
+			return "", errors.New("keychain access blocked")
+		}
+		return base64.StdEncoding.EncodeToString(keychainKey), nil
+	}
+	keyringSet = func(service, user, password string) error {
+		return nil
+	}
+	t.Cleanup(func() {
+		keyringGet = origGet
+		keyringSet = origSet
+	})
+
+	service := "test-service"
+	account := "test-account"
+	secret := "secret-value"
+
+	dir := StorageDir(service)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	encrypted, err := encryptData(secret, keychainKey)
+	if err != nil {
+		t.Fatalf("encryptData() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, safeFileName(account)), encrypted, 0600); err != nil {
+		t.Fatalf("WriteFile(secret) error = %v", err)
+	}
+
+	got, err := platformGet(service, account)
+	if err != nil {
+		t.Fatalf("first platformGet() error = %v", err)
+	}
+	if got != secret {
+		t.Fatalf("first platformGet() = %q, want %q", got, secret)
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, fileMasterKeyName)); err != nil {
+		t.Fatalf("file master key not created after migration: %v", err)
+	}
+
+	keyringAvailable = false
+
+	got2, err := platformGet(service, account)
+	if err != nil {
+		t.Fatalf("second platformGet() (no keychain) error = %v", err)
+	}
+	if got2 != secret {
+		t.Fatalf("second platformGet() = %q, want %q", got2, secret)
+	}
+}
+
 // TestPlatformGetPrefersFileMasterKey verifies reads prefer the file-based master key
 // before trying the system keychain master key.
 func TestPlatformGetPrefersFileMasterKey(t *testing.T) {
